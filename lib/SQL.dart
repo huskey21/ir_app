@@ -6,14 +6,14 @@ class SQL
   void Function()? onConnection;
   void Function(Results result)? onResult;
 
-  Future<void> connectToDB() async
+  Future<void> connectToDB(String host, int port, String user, String password, String dbName) async
   {
     ConnectionSettings settings = new ConnectionSettings(
-        host: 'localhost',
-        port: 3306,
-        user: 'root',
-        password: '123456',
-        db: 'rc'
+        host: host,
+        port: port,
+        user: user,
+        password: password,
+        db: dbName
     );
     conn = await MySqlConnection.connect(settings);
     onConnection!();

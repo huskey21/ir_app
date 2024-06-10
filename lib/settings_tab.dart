@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:mysql1/mysql1.dart';
+import 'package:ir_app/SQL.dart';
 import 'package:ir_app/remote_controller.dart';
 
 class SettingsTab extends StatefulWidget {
@@ -17,7 +19,7 @@ class SettingsTab extends StatefulWidget {
   final void Function(int index)? onRCRemove;
   final void Function(int index)? onRCSettings;
   final void Function(int index, bool toggle)? onRCTabChange;
-  final void Function(String address, String user, String password, String dbName)? onSQLRequest;
+  final void Function(List<RemoteController> rcList)? onSQLRequest;
   final List<RemoteController> rcList;
   final List<bool> activeTabs;
 
@@ -42,6 +44,47 @@ class _SettingsTabState extends State<SettingsTab>
         },
       );
     });
+  }
+
+  void _getRC(Results results)
+  {
+    Map<String, Map<String, int>> rcButtons = {};
+    for (var row in results)
+    {
+      if (!rcButtons.keys.contains(row[0]))
+      {
+        if (row[4] == 0x1)
+        {
+          rcButtons.addAll({row[0]: {"X": row[1], "Y": row[2]}});
+        }
+        else
+        {
+          rcButtons.addAll({row[0]: {row[1]: row[2]}});
+        }
+      }
+      else
+      {
+        for (String key in rcButtons.keys)
+        {
+          if (row[4] == 0x1)
+          {
+            rcButtons[key]!.addAll({"X": row[1], "Y": row[2]});
+          }
+          if (key == row[0])
+          {
+            rcButtons[key]!.addAll({row[1]:row[2]});
+          }
+        }
+      }
+    }
+    List<RemoteController> rcs = [];
+    for (String rc in rcButtons.keys)
+    {
+      List<String> content = rcButtons[rc]!.keys.toList();
+      content.remove("X");
+      content.remove("Y");
+      rcs.add(new RemoteController(rc, rcButtons[rc]!["X"]!, rcButtons[rc]!["Y"]!, content: content));
+    }
   }
 
   @override
@@ -85,7 +128,7 @@ class _SettingsTabState extends State<SettingsTab>
             border: Border.all(color: Colors.green),
             borderRadius: BorderRadius.circular(15)
           ),
-          height: 500,
+          height: 400,
           width: 350,
           child: ListView.builder(
             itemCount: widget.rcList.length,
@@ -133,7 +176,34 @@ class _SettingsTabState extends State<SettingsTab>
               showDialog(context: context, builder: (BuildContext context){
                 return RCSQL(
                   onSubmit: (address, user, password, dbName){
-
+                    var parts = address.split(":");
+                    int port = 0;
+                    try
+                    {
+                      port = int.parse(parts[1]);
+                    }
+                    catch(Exception)
+                    {
+                      showDialog(context: context, builder: (BuildContext context){
+                        return AlertDialog(
+                          title: Text("Некорректная команда"),
+                          actions: [
+                            TextButton(
+                                onPressed: (){
+                                  Navigator.pop(context);
+                                },
+                                child: Text("Ok")
+                            )
+                          ],
+                        );
+                      });
+                      return;
+                    }
+                    SQL sql = new SQL();
+                    sql.onResult = _getRC;
+                    sql.connectToDB(parts[0], port, user, password, dbName).whenComplete((){
+                      sql.sendQuery("select * from rc");
+                    });
                   },
                 );
               });
