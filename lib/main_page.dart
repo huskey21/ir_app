@@ -95,8 +95,10 @@ class _MyHomePageState extends State<MyHomePage> {
           },
           onRCRemove: (int index)
           {
-            rcList.removeAt(index);
-            activeTabs.removeAt(index);
+            setState(() {
+              rcList.removeAt(index);
+              activeTabs.removeAt(index);
+            });
           },
           onRCSettings: (int index)
           {
@@ -105,6 +107,12 @@ class _MyHomePageState extends State<MyHomePage> {
                 return RCSettings(title: "Настройка пульта - " + rcList[index].name, remoteController: rcList[index]);
               })
             );
+          },
+          onSQLRequest: (List<RemoteController> newRsList)
+          {
+            setState(() {
+              rcList = newRsList;
+            });
           },
           rcList: rcList,
           activeTabs: activeTabs,

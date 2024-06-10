@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mysql1/mysql1.dart';
 import 'package:ir_app/SQL.dart';
 import 'package:ir_app/remote_controller.dart';
+import 'package:ir_app/rc_settings.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({
@@ -46,6 +47,48 @@ class _SettingsTabState extends State<SettingsTab>
     });
   }
 
+  String getBitString(int number)
+  {
+    if (number < 2)
+    {
+      return "$number";
+    }
+    else
+    {
+      if (number % 2 == 0)
+      {
+        return "0" + getBitString(number ~/ 2);
+      }
+      else
+      {
+        return "1" + getBitString(number ~/ 2);
+      }
+    }
+  }
+
+  List<int> getPattern(String code)
+  {
+    List<int> pattern = [];
+    List<String> symbols = code.split('');
+    for (String symbol in symbols)
+    {
+      if (symbol == "1")
+      {
+        pattern.addAll([1200,600]);
+      }
+      else if(symbol == "0")
+      {
+        pattern.addAll([600,600]);
+      }
+      else
+      {
+        return [-1];
+      }
+    }
+    pattern.insertAll(0, [2400,600]);
+    return pattern;
+  }
+
   void _getRC(Results results)
   {
     Map<String, Map<String, int>> rcButtons = {};
@@ -81,10 +124,40 @@ class _SettingsTabState extends State<SettingsTab>
     for (String rc in rcButtons.keys)
     {
       List<String> content = rcButtons[rc]!.keys.toList();
+      List<List<int>> commands = [];
+      for (int command in rcButtons[rc]!.values.toList())
+      {
+        commands.add(getPattern(getBitString(command)));
+      }
       content.remove("X");
       content.remove("Y");
       rcs.add(new RemoteController(rc, rcButtons[rc]!["X"]!, rcButtons[rc]!["Y"]!, content: content));
+      rcs[-1].commands = commands;
+      rcs[-1].update();
     }
+    widget.onSQLRequest!(rcs);
+  }
+
+  void _sendSQlSave(String ip, int port, String user, String password, String dbName)
+  {
+    String query = "insert into rc values\n";
+    for (RemoteController rc in widget.rcList)
+    {
+      query += rc.getSQLSave();
+      for (int i = 0; i < rc.content.length; i++)
+      {
+        int command = 0;
+        for (int a = rc.commands[i].length - 2;  a >= 2; a -= 2)
+        {
+          command += (((rc.commands[i][a] / 600) as int) - 1) * 2^(((a/2)as int)-1);
+        }
+        query += "(${rc.name},${rc.content[i]},${command},0)\n";
+      }
+    }
+    SQL sql = new SQL();
+    sql.connectToDB(ip, port, user, password, dbName).whenComplete((){
+      sql.sendQuery(query);
+    });
   }
 
   @override
@@ -171,45 +244,84 @@ class _SettingsTabState extends State<SettingsTab>
           ),
         ),
         Padding(padding: EdgeInsets.only(bottom: 25)),
-        TextButton(
-            onPressed: () {
-              showDialog(context: context, builder: (BuildContext context){
-                return RCSQL(
-                  onSubmit: (address, user, password, dbName){
-                    var parts = address.split(":");
-                    int port = 0;
-                    try
-                    {
-                      port = int.parse(parts[1]);
-                    }
-                    catch(Exception)
-                    {
-                      showDialog(context: context, builder: (BuildContext context){
-                        return AlertDialog(
-                          title: Text("Некорректная команда"),
-                          actions: [
-                            TextButton(
-                                onPressed: (){
-                                  Navigator.pop(context);
-                                },
-                                child: Text("Ok")
-                            )
-                          ],
-                        );
-                      });
-                      return;
-                    }
-                    SQL sql = new SQL();
-                    sql.onResult = _getRC;
-                    sql.connectToDB(parts[0], port, user, password, dbName).whenComplete((){
-                      sql.sendQuery("select * from rc");
-                    });
-                  },
-                );
-              });
-            },
-            child: Text("Загрузить из MySQL")
-        ),
+        Row(
+          children: [
+            TextButton(
+                onPressed: () {
+                  showDialog(context: context, builder: (BuildContext context){
+                    return RCSQL(
+                      onSubmit: (address, user, password, dbName){
+                        var parts = address.split(":");
+                        int port = 0;
+                        try
+                        {
+                          port = int.parse(parts[1]);
+                        }
+                        catch(Exception)
+                        {
+                          showDialog(context: context, builder: (BuildContext context){
+                            return AlertDialog(
+                              title: Text("Некорректная ip адрес"),
+                              actions: [
+                                TextButton(
+                                    onPressed: (){
+                                      Navigator.pop(context);
+                                    },
+                                    child: Text("Ok")
+                                )
+                              ],
+                            );
+                          });
+                          return;
+                        }
+                        SQL sql = new SQL();
+                        sql.onResult = _getRC;
+                        sql.connectToDB(parts[0], port, user, password, dbName).whenComplete((){
+                          sql.sendQuery("select * from rc");
+                        });
+                      },
+                    );
+                  });
+                },
+                child: Text("Загрузить из MySQL")
+            ),
+            TextButton(
+                onPressed: () {
+                  showDialog(context: context, builder: (BuildContext context){
+                    return RCSQL(
+                      onSubmit: (address, user, password, dbName){
+                        var parts = address.split(":");
+                        int port = 0;
+                        try
+                        {
+                          port = int.parse(parts[1]);
+                        }
+                        catch(Exception)
+                        {
+                          showDialog(context: context, builder: (BuildContext context){
+                            return AlertDialog(
+                              title: Text("Некорректная ip адрес"),
+                              actions: [
+                                TextButton(
+                                    onPressed: (){
+                                      Navigator.pop(context);
+                                    },
+                                    child: Text("Ok")
+                                )
+                              ],
+                            );
+                          });
+                          return;
+                        }
+                        _sendSQlSave(parts[0], port, user, password, dbName);
+                      },
+                    );
+                  });
+                },
+                child: Text("Загрузить в MySQL")
+            ),
+          ],
+        )
       ],
     );
   }

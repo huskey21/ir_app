@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ir_app/remote_controller.dart';
-import 'package:ir_sensor_plugin/ir_sensor_plugin.dart';
 
 class RCSettings extends StatefulWidget {
   const RCSettings({super.key, required this.title, required this.remoteController});
@@ -18,11 +17,6 @@ class _RCSettingsState extends State<RCSettings> {
   @override
   void initState() {
     _remoteController = RemoteController.clone(widget.remoteController);
-  }
-
-  Future<void> IRTransmit(List<int> pattern) async
-  {
-    final String result = await IrSensorPlugin.transmitListInt(list: pattern);
   }
 
   List<int> getPattern(String code)
@@ -78,9 +72,8 @@ class _RCSettingsState extends State<RCSettings> {
               else {
                 setState(() {
                   widget.remoteController.content[i] = name;
-                  widget.remoteController.onPressed[i] = () {
-                    IRTransmit(getPattern(message));
-                  };
+                  widget.remoteController.commands[i] = getPattern(message);
+                  widget.remoteController.update();
                 });
               }
             },

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:ir_sensor_plugin/ir_sensor_plugin.dart';
 
 class RemoteController
 {
   late String name;
   late int _rows, _columns;
-  List<Function()> onPressed = [];
+  late List<Function()> onPressed;
+  List<List<int>> commands = [];
   List<String> content = [];
   late ButtonStyle? _buttonStyle;
 
@@ -32,9 +34,33 @@ class RemoteController
     _rows = rows;
     _columns = columns;
     _buttonStyle = buttonStyle;
+    onPressed = new List<Function()>.filled(content!.length, (){});
+    commands = new List<List<int>>.filled(content.length, []);
   }
 
   RemoteController.clone(RemoteController rc): this(rc.name, rc._rows, rc._columns, content: rc.content, buttonStyle: rc._buttonStyle);
+
+  Future<void> IRTransmit(List<int> pattern) async
+  {
+    final String result = await IrSensorPlugin.transmitListInt(list: pattern);
+  }
+
+  void update()
+  {
+    for (int i = 0; i < commands.length; i++)
+    {
+      if (!commands[i].isEmpty){
+        onPressed[i] = (){
+          IRTransmit(commands[i]);
+        };
+      }
+    }
+  }
+
+  String getSQLSave()
+  {
+    return "($name,$_rows,$_columns,1)\n";
+  }
 
   Row _getRow(List<String> content)
   {
