@@ -244,7 +244,8 @@ class _SettingsTabState extends State<SettingsTab>
           ),
         ),
         Padding(padding: EdgeInsets.only(bottom: 25)),
-        Row(
+        Center(
+         child: Row(
           children: [
             TextButton(
                 onPressed: () {
@@ -319,8 +320,9 @@ class _SettingsTabState extends State<SettingsTab>
                   });
                 },
                 child: Text("Загрузить в MySQL")
-            ),
-          ],
+              ),
+            ],
+          )
         )
       ],
     );

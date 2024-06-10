@@ -5,7 +5,7 @@ class RemoteController
 {
   late String name;
   late int _rows, _columns;
-  late List<Function()> onPressed;
+  List<Function()> onPressed = [];
   List<List<int>> commands = [];
   List<String> content = [];
   late ButtonStyle? _buttonStyle;
@@ -34,8 +34,8 @@ class RemoteController
     _rows = rows;
     _columns = columns;
     _buttonStyle = buttonStyle;
-    onPressed = new List<Function()>.filled(content!.length, (){});
-    commands = new List<List<int>>.filled(content.length, []);
+    onPressed = new List<Function()>.filled(this.content.length, (){});
+    commands = new List<List<int>>.filled(this.content.length, []);
   }
 
   RemoteController.clone(RemoteController rc): this(rc.name, rc._rows, rc._columns, content: rc.content, buttonStyle: rc._buttonStyle);
