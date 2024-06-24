@@ -7,6 +7,7 @@ class RemoteController
   late int _rows, _columns;
   List<Function()> onPressed = [];
   List<List<int>> commands = [];
+  List<String> hexCommands = [];
   List<String> content = [];
   late ButtonStyle? _buttonStyle;
 
@@ -36,6 +37,7 @@ class RemoteController
     _buttonStyle = buttonStyle;
     onPressed = new List<Function()>.filled(this.content.length, (){});
     commands = new List<List<int>>.filled(this.content.length, []);
+    hexCommands = new List<String>.filled(this.content.length, "");
   }
 
   RemoteController.clone(RemoteController rc): this(rc.name, rc._rows, rc._columns, content: rc.content, buttonStyle: rc._buttonStyle);
@@ -45,6 +47,11 @@ class RemoteController
     final String result = await IrSensorPlugin.transmitListInt(list: pattern);
   }
 
+  Future<void> IRTransmitHex(String pattern) async
+  {
+    final String result = await IrSensorPlugin.transmitString(pattern: pattern);
+  }
+
   void update()
   {
     for (int i = 0; i < commands.length; i++)
@@ -52,6 +59,12 @@ class RemoteController
       if (!commands[i].isEmpty){
         onPressed[i] = (){
           IRTransmit(commands[i]);
+        };
+      }
+      else if (!hexCommands[i].isEmpty)
+      {
+        onPressed[i] = (){
+          IRTransmitHex(hexCommands[i]);
         };
       }
     }

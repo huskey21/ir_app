@@ -24,6 +24,30 @@ class SettingsTab extends StatefulWidget {
   final List<RemoteController> rcList;
   final List<bool> activeTabs;
 
+  static String getBitString(int number)
+  {
+    return getReverseBitString(number).split('').reversed.join();
+  }
+
+  static String getReverseBitString(int number)
+  {
+    if (number < 2)
+    {
+      return "$number";
+    }
+    else
+    {
+      if (number % 2 == 0)
+      {
+        return "0" + getBitString(number ~/ 2);
+      }
+      else
+      {
+        return "1" + getBitString(number ~/ 2);
+      }
+    }
+  }
+
   @override
   State<SettingsTab> createState() => _SettingsTabState();
 }
@@ -45,25 +69,6 @@ class _SettingsTabState extends State<SettingsTab>
         },
       );
     });
-  }
-
-  String getBitString(int number)
-  {
-    if (number < 2)
-    {
-      return "$number";
-    }
-    else
-    {
-      if (number % 2 == 0)
-      {
-        return "0" + getBitString(number ~/ 2);
-      }
-      else
-      {
-        return "1" + getBitString(number ~/ 2);
-      }
-    }
   }
 
   List<int> getPattern(String code)
@@ -127,7 +132,7 @@ class _SettingsTabState extends State<SettingsTab>
       List<List<int>> commands = [];
       for (int command in rcButtons[rc]!.values.toList())
       {
-        commands.add(getPattern(getBitString(command)));
+        commands.add(getPattern(SettingsTab.getBitString(command)));
       }
       content.remove("X");
       content.remove("Y");

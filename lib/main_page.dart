@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:ir_app/library.dart';
 import 'package:ir_app/rc_settings.dart';
 import 'package:ir_app/tabs_manager.dart';
 import 'package:ir_app/remote_controller.dart';
@@ -27,25 +30,127 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
 
   String settingsTabName = "Settings";
+  String libraryTabName = "Library";
   bool hasIrEmitter = true;
 
-  TabsManager tabs = new TabsManager(
-      fixedTabs: {
-        -1: "Settings"
-      }
-  );
+  late TabsManager tabs;
 
   List<RemoteController> rcList = [
     new RemoteController("1", 3, 3, buttonStyle: buttonStyle1),
     new RemoteController("2", 2, 2, buttonStyle: buttonStyle1),
     new RemoteController("3", 2, 5, buttonStyle: buttonStyle1)
   ];
+  List<RemoteController> rcLibraryList = [new RemoteController("1", 3, 3, buttonStyle: buttonStyle1)];
 
   List<bool> activeTabs = [false,false,false];
+  List<bool> activeLibraryTabs = [false,false,false];
 
   Future<void> getIRStatus() async
   {
     hasIrEmitter = await IrSensorPlugin.hasIrEmitter;
+  }
+
+  Future<List<RemoteController>> _getLibrary()
+  async {
+    List<RemoteController> result = [];
+    var file = await rootBundle.loadString('assets/codes.json');
+    var data = jsonDecode(file);
+    for (String rcName in data.keys)
+    {
+      int columns = 0, rows = 0, buttonsCount = data[rcName].length;
+      for (int i = 1; i < buttonsCount; i++)
+      {
+        if (i != 1 && buttonsCount % i == 0)
+        {
+          columns = i;
+          rows = buttonsCount ~/ i;
+          if (i == rows)
+          {
+            break;
+          }
+        }
+      }
+      RemoteController rc = RemoteController(rcName, rows, columns);
+      for (int i = 0; i < buttonsCount; i++)
+      {
+        var button = data[rcName][i];
+        String protocol = RCSettings.hexName;
+        String message = "";
+        if (button['protocol'].contains("NEC"))
+        {
+          if (button['subdevice'] == -1)
+          {
+            protocol = RCSettings.necName;
+            message = getBitString(button['device'], 8);
+          }
+          else
+          {
+            protocol = RCSettings.extendedNecName;
+            message = getBitString(button['device'], 8) + getBitString(button['subdevice'], 8);
+          }
+          message += getBitString(button['function'], 8);
+        }
+        if (button['protocol'].contains("Sony"))
+        {
+          message = getBitString(button['device'], 5);
+          if (button['protocol'].contains("20"))
+          {
+            protocol = RCSettings.sirc12Name;
+            message += getBitString(button['function'], 15);
+          }
+          if (button['protocol'].contains("15"))
+          {
+            protocol = RCSettings.sirc15Name;
+            message += getBitString(button['function'], 10);
+          }
+          if (button['protocol'].contains("12"))
+          {
+            protocol = RCSettings.sirc12Name;
+            message += getBitString(button['function'], 7);
+          }
+        }
+        RCSettings.setRCButton(rc, i, message, protocol, button['functionname']);
+      }
+      rc.update();
+      result.add(rc);
+    }
+    return result;
+  }
+
+  String getBitString(int number, symbolCount)
+  {
+    String result = SettingsTab.getBitString(number);
+    while (result.length < symbolCount)
+    {
+      result += "0" + result;
+    }
+    if (result.length > symbolCount)
+    {
+      var slices = result.split('');
+      result = "";
+      for (int i = slices.length - 1; i > slices.length - 1 - symbolCount; i--)
+      {
+        result += slices[i];
+      }
+    }
+    return result;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    tabs = new TabsManager(
+        fixedTabs: {
+          -1: libraryTabName,
+          -2: settingsTabName
+        }
+    );
+    _getLibrary().then((List<RemoteController> rcList){
+      setState(() {
+        rcLibraryList = rcList;
+        activeLibraryTabs = List<bool>.filled(rcList.length, false);
+      });
+    });
   }
 
   @override
@@ -70,6 +175,27 @@ class _MyHomePageState extends State<MyHomePage> {
     List<Widget> tabsList = [];
     for (int i = 0; i < tabs.length; i++)
     {
+      if (tabs.getTabs()[i] == libraryTabName)
+      {
+        tabsList.add(LibraryTab(
+          onRCTabChange: (int index, bool toggle)
+          {
+            setState(() {
+              activeLibraryTabs[index] = toggle;
+              if (toggle == true)
+              {
+                tabs.addTab(rcLibraryList[index].name);
+              }
+              else
+              {
+                tabs.removeTab(rcLibraryList[index].name);
+              }
+            });
+          },
+          rcList: rcLibraryList,
+          activeTabs: activeLibraryTabs,
+        ));
+      }
       if (tabs.getTabs()[i] == settingsTabName)
       {
         tabsList.add(SettingsTab(
@@ -102,11 +228,13 @@ class _MyHomePageState extends State<MyHomePage> {
           },
           onRCSettings: (int index)
           {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (BuildContext context){
-                return RCSettings(title: "Настройка пульта - " + rcList[index].name, remoteController: rcList[index]);
-              })
-            );
+            setState(() {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (BuildContext context){
+                    return RCSettings(title: "Настройка пульта - " + rcList[index].name, remoteController: rcList[index]);
+                  })
+              );
+            });
           },
           onSQLRequest: (List<RemoteController> newRsList)
           {
@@ -123,6 +251,12 @@ class _MyHomePageState extends State<MyHomePage> {
         for (int a = 0; a < rcList.length; a++) {
           if (tabs.getTabs()[i] == rcList[a].name) {
             tabsList.add(rcList[a].build());
+            break;
+          }
+        }
+        for (int a = 0; a < rcLibraryList.length; a++) {
+          if (tabs.getTabs()[i] == rcLibraryList[a].name) {
+            tabsList.add(rcLibraryList[a].build());
             break;
           }
         }
