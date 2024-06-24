@@ -10,7 +10,7 @@ class RCSettings extends StatefulWidget {
   static const String necName = "NEC", extendedNecName = "ExtendedNEC", sirc20Name = "SIRC20",
       sirc15Name = "SIRC15",sirc12Name = "SIRC12",hexName = "HEX";
 
-  static Map<String, IrPattern?> protocols = {
+  static Map<String, LengthPattern?> protocols = {
     RCSettings.necName: Nec(),
     RCSettings.extendedNecName: ExtendedNec(),
     RCSettings.sirc20Name: Sirc20(),
@@ -21,22 +21,21 @@ class RCSettings extends StatefulWidget {
 
   static int setRCButton(RemoteController rc, int index, String message, String protocol, String name)
   {
-    if (protocol != "HEX" && message.length != protocol.length){
-
+    if (protocol != RCSettings.hexName && message.length != RCSettings.protocols[protocol]?.length){
       return -1;
     }
     List<int>? pattern;
-    if (protocol != "HEX")
+    if (protocol != RCSettings.hexName)
     {
       pattern = protocols[protocol]?.getPattern(message);
     }
-    if (protocol != "HEX" && pattern?.length == 1)
+    if (protocol != RCSettings.hexName && pattern?.length == 1)
     {
       return -2;
     }
     else {
       rc.content[index] = name;
-      if (protocol == "HEX")
+      if (protocol == RCSettings.hexName)
       {
         rc.hexCommands[index] = message;
       }

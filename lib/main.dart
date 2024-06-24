@@ -5,17 +5,34 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+
+  bool darkMode = false;
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ИК приложение',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green, brightness: darkMode ? Brightness.dark : Brightness.light),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: "ИК приложение"),
+      home: MyHomePage(
+        title: "ИК приложение",
+        onThemeBrightnessChange: ()
+        {
+          setState(() {
+            darkMode = !darkMode;
+          });
+        },
+      ),
     );
   }
 }

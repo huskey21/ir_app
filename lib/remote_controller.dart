@@ -15,25 +15,18 @@ class RemoteController
   {
     if (content != null)
     {
-      if (rows * columns != content.length)
-      {
-        throw ArgumentError("Wrong size of content");
-      }
       this.content = content;
     }
     else
     {
-      for (int i = 0; i < rows * columns;i++)
-      {
-        this.content.add("default");
-      }
+      this.content = new List<String>.filled(rows * columns, "");
     }
     for (int i = 0; i < rows * columns;i++)
     {
       onPressed.add((){});
     }
-    _rows = rows;
-    _columns = columns;
+    _rows = columns;
+    _columns = rows;
     _buttonStyle = buttonStyle;
     onPressed = new List<Function()>.filled(this.content.length, (){});
     commands = new List<List<int>>.filled(this.content.length, []);

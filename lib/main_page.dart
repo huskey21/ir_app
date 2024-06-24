@@ -20,8 +20,9 @@ ButtonStyle buttonStyle1 = ButtonStyle(
 );
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  const MyHomePage({super.key, required this.title, this.onThemeBrightnessChange});
   final String title;
+  final void Function()? onThemeBrightnessChange;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -57,20 +58,8 @@ class _MyHomePageState extends State<MyHomePage> {
     var data = jsonDecode(file);
     for (String rcName in data.keys)
     {
-      int columns = 0, rows = 0, buttonsCount = data[rcName].length;
-      for (int i = 1; i < buttonsCount; i++)
-      {
-        if (i != 1 && buttonsCount % i == 0)
-        {
-          columns = i;
-          rows = buttonsCount ~/ i;
-          if (i == rows)
-          {
-            break;
-          }
-        }
-      }
-      RemoteController rc = RemoteController(rcName, rows, columns);
+      int columns = data[rcName].length ~/ 3 + 1, buttonsCount = data[rcName].length;
+      RemoteController rc = RemoteController(rcName, 3, columns, buttonStyle: buttonStyle1);
       for (int i = 0; i < buttonsCount; i++)
       {
         var button = data[rcName][i];
@@ -90,7 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
           }
           message += getBitString(button['function'], 8);
         }
-        if (button['protocol'].contains("Sony"))
+        else if (button['protocol'].contains("Sony"))
         {
           message = getBitString(button['device'], 5);
           if (button['protocol'].contains("20"))
@@ -98,12 +87,12 @@ class _MyHomePageState extends State<MyHomePage> {
             protocol = RCSettings.sirc12Name;
             message += getBitString(button['function'], 15);
           }
-          if (button['protocol'].contains("15"))
+          else if (button['protocol'].contains("15"))
           {
             protocol = RCSettings.sirc15Name;
             message += getBitString(button['function'], 10);
           }
-          if (button['protocol'].contains("12"))
+          else if (button['protocol'].contains("12"))
           {
             protocol = RCSettings.sirc12Name;
             message += getBitString(button['function'], 7);
@@ -241,6 +230,10 @@ class _MyHomePageState extends State<MyHomePage> {
             setState(() {
               rcList = newRsList;
             });
+          },
+          onThemeBrightnessChange: ()
+          {
+            widget.onThemeBrightnessChange!();
           },
           rcList: rcList,
           activeTabs: activeTabs,

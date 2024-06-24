@@ -68,7 +68,6 @@ class Sirc12 extends Sirc20
 
 class Nec extends LengthPattern
 {
-
   Nec()
   {
     length = 16;

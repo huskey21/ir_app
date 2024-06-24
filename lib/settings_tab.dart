@@ -1,5 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:ir_app/main.dart';
+import 'package:ir_app/main_page.dart';
+import 'package:ir_app/models/ir_pattern.dart';
 import 'package:mysql1/mysql1.dart';
 import 'package:ir_app/SQL.dart';
 import 'package:ir_app/remote_controller.dart';
@@ -14,13 +17,15 @@ class SettingsTab extends StatefulWidget {
     this.onRCRemove,
     this.onRCTabChange,
     this.onRCSettings,
-    this.onSQLRequest
+    this.onSQLRequest,
+    this.onThemeBrightnessChange
   });
   final void Function(String name, int rows, int columns)? onRCAdd;
   final void Function(int index)? onRCRemove;
   final void Function(int index)? onRCSettings;
   final void Function(int index, bool toggle)? onRCTabChange;
   final void Function(List<RemoteController> rcList)? onSQLRequest;
+  final void Function()? onThemeBrightnessChange;
   final List<RemoteController> rcList;
   final List<bool> activeTabs;
 
@@ -96,49 +101,43 @@ class _SettingsTabState extends State<SettingsTab>
 
   void _getRC(Results results)
   {
-    Map<String, Map<String, int>> rcButtons = {};
+    List<RemoteController> rcs = [];
+    List<List<String>> rcCommands = [];
+    List<List<String>> rcProtocols = [];
+    List<String> rcNames = [];
+    List<List<String>> rcButtonsNames = [];
     for (var row in results)
     {
-      if (!rcButtons.keys.contains(row[0]))
+      int lastIndex = rcNames.length - 1;
+      if (rcNames.isNotEmpty || rcNames[lastIndex] == row[0])
       {
-        if (row[4] == 0x1)
-        {
-          rcButtons.addAll({row[0]: {"X": row[1], "Y": row[2]}});
-        }
-        else
-        {
-          rcButtons.addAll({row[0]: {row[1]: row[2]}});
-        }
+        var protocolAndCommand = getCommandAndProtocol(row);
+        rcProtocols[lastIndex].add(protocolAndCommand.keys.toList()[0]);
+        rcCommands[lastIndex].add(protocolAndCommand.values.toList()[0]);
+        rcButtonsNames[lastIndex].add(row[1]);
       }
       else
       {
-        for (String key in rcButtons.keys)
-        {
-          if (row[4] == 0x1)
-          {
-            rcButtons[key]!.addAll({"X": row[1], "Y": row[2]});
-          }
-          if (key == row[0])
-          {
-            rcButtons[key]!.addAll({row[1]:row[2]});
-          }
-        }
+        rcNames.add(row[0]);
+        var protocolAndCommand = getCommandAndProtocol(row);
+        rcProtocols.add([protocolAndCommand.keys.toList()[0]]);
+        rcCommands.add([protocolAndCommand.values.toList()[0]]);
+        rcButtonsNames.add([row[1]]);
       }
     }
-    List<RemoteController> rcs = [];
-    for (String rc in rcButtons.keys)
+    for (int i = 0; i < rcNames.length; i++)
     {
-      List<String> content = rcButtons[rc]!.keys.toList();
-      List<List<int>> commands = [];
-      for (int command in rcButtons[rc]!.values.toList())
+      List<String> commands = rcCommands[i];
+      List<String> protocols = rcProtocols[i];
+      List<String> names = rcButtonsNames[i];
+      int rows = commands.length ~/ 3 + 1;
+      RemoteController remoteController = new RemoteController(rcNames[i], rows, 3);
+      for (int a = 0; a < commands.length; a++)
       {
-        commands.add(getPattern(SettingsTab.getBitString(command)));
+        RCSettings.setRCButton(remoteController, a, commands[a], protocols[a], names[a]);
       }
-      content.remove("X");
-      content.remove("Y");
-      rcs.add(new RemoteController(rc, rcButtons[rc]!["X"]!, rcButtons[rc]!["Y"]!, content: content));
-      rcs[-1].commands = commands;
-      rcs[-1].update();
+      remoteController.update();
+      rcs.add(remoteController);
     }
     widget.onSQLRequest!(rcs);
   }
@@ -165,6 +164,65 @@ class _SettingsTabState extends State<SettingsTab>
     });
   }
 
+  Map<String, String> getCommandAndProtocol(var data)
+  {
+    String protocol = RCSettings.hexName;
+    String message = data[5];
+    if (data[2].contains("NEC"))
+    {
+      if (data[4] == -1)
+      {
+        protocol = RCSettings.necName;
+        message = getBitString(data[3], 8);
+      }
+      else
+      {
+        protocol = RCSettings.extendedNecName;
+        message = getBitString(data[3], 8) + getBitString(data[4], 8);
+      }
+      message += getBitString(data[5], 8);
+    }
+    else if (data[2].contains("Sony"))
+    {
+      message = getBitString(data[3], 5);
+      if (data[2].contains("20"))
+      {
+        protocol = RCSettings.sirc12Name;
+        message += getBitString(data[5], 15);
+      }
+      else if (data[2].contains("15"))
+      {
+        protocol = RCSettings.sirc15Name;
+        message += getBitString(data[5], 10);
+      }
+      else if (data[2].contains("12"))
+      {
+        protocol = RCSettings.sirc12Name;
+        message += getBitString(data[5], 7);
+      }
+    }
+    return {protocol: message};
+  }
+
+  String getBitString(int number, symbolCount)
+  {
+    String result = SettingsTab.getBitString(number);
+    while (result.length < symbolCount)
+    {
+      result += "0" + result;
+    }
+    if (result.length > symbolCount)
+    {
+      var slices = result.split('');
+      result = "";
+      for (int i = slices.length - 1; i > slices.length - 1 - symbolCount; i--)
+      {
+        result += slices[i];
+      }
+    }
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -175,7 +233,17 @@ class _SettingsTabState extends State<SettingsTab>
               Text("Настройки", style: TextStyle(fontSize: 36),)
             ]
         ),
-        Padding(padding: EdgeInsets.only(bottom: 50)),
+        Padding(padding: EdgeInsets.only(bottom: 30)),
+        Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              TextButton(child: Text("Темный режим:"), onPressed: ()
+              {
+                widget.onThemeBrightnessChange!();
+              }, style: buttonStyle1)
+            ]
+        ),
+        Padding(padding: EdgeInsets.only(bottom: 25)),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -196,7 +264,7 @@ class _SettingsTabState extends State<SettingsTab>
                 onPressed: () {
                   _showRCAddMenu();
                 },
-                child: Text("Добавить")
+                child: Text("Добавить"), style: buttonStyle1
             ),
           ],
         ),
@@ -289,7 +357,7 @@ class _SettingsTabState extends State<SettingsTab>
                     );
                   });
                 },
-                child: Text("Загрузить из MySQL")
+                child: Text("Загрузить из MySQL"), style: buttonStyle1
             ),
             TextButton(
                 onPressed: () {
@@ -324,9 +392,10 @@ class _SettingsTabState extends State<SettingsTab>
                     );
                   });
                 },
-                child: Text("Загрузить в MySQL")
+                child: Text("Загрузить в MySQL"), style: buttonStyle1
               ),
             ],
+           mainAxisAlignment: MainAxisAlignment.spaceAround,
           )
         )
       ],
